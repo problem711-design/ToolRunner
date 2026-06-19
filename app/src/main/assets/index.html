@@ -2,43 +2,627 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>マイ簡易ツール</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ぷよ風パズル</title>
     <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
         body {
-            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: #fff;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            height: 100vh;
+            overflow: hidden;
+        }
+        /* 上部ステータスエリア */
+        .header {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-bottom: 2px solid #333;
+        }
+        .status-box {
+            text-align: center;
+        }
+        .status-label {
+            font-size: 12px;
+            color: #aaa;
+            margin-bottom: 2px;
+        }
+        .status-value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        #chain-display {
+            color: #ff3366;
+            text-shadow: 0 0 10px rgba(255, 51, 102, 0.5);
+        }
+        /* NEXTぷよの見た目 */
+        .next-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+        .next-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 1px solid #fff;
+        }
+        /* ゲーム盤面 */
+        #canvas-container {
+            width: 100%;
+            max-width: 360px;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+        }
+        canvas {
+            background-color: #111;
+            border: 4px solid #444;
+            border-radius: 8px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+        }
+        /* コントローラー（スマホ用） */
+        .controls {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px 10px;
+            border-top: 2px solid #333;
+        }
+        .control-row {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        .control-row:last-child {
+            margin-bottom: 0;
+        }
+        .btn {
+            background: #444;
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 15px 0;
+            width: 75px;
+            text-align: center;
+            box-shadow: 0 4px #222;
+        }
+        .btn:active {
+            background: #666;
+            transform: translateY(2px);
+            box-shadow: 0 2px #222;
+        }
+        .btn-large {
+            width: 110px;
+            background: #007bff;
+            box-shadow: 0 4px #004085;
+        }
+        .btn-large:active {
+            background: #0056b3;
+            box-shadow: 0 2px #004085;
+        }
+        /* スタート・ゲームオーバー画面 */
+        #overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f2f5;
+            z-index: 10;
         }
-        .container {
-            text-align: center;
-            padding: 20px;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        #overlay h1 {
+            font-size: 36px;
+            margin-bottom: 20px;
+            color: #ffcc00;
+            text-shadow: 0 0 15px rgba(255,204,0,0.4);
         }
-        h1 { color: #333; }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #007bff;
+        #start-btn {
+            padding: 15px 40px;
+            font-size: 22px;
+            font-weight: bold;
+            background: #28a745;
             color: white;
             border: none;
-            border-radius: 5px;
-            cursor: pointer;
+            border-radius: 30px;
+            box-shadow: 0 6px #1e7e34;
+        }
+        #start-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 3px #1e7e34;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>APK化成功！</h1>
-        <p>ここにあなたのHTMLツールを貼り付けます。</p>
-        <button onclick="alert('動作確認OK！')">クリックしてみてね</button>
+
+    <div class="header">
+        <div class="status-box">
+            <div class="status-label">SCORE</div>
+            <div id="score-display" class="status-value">0</div>
+        </div>
+        <div class="status-box">
+            <div class="status-label">CHAIN</div>
+            <div id="chain-display" class="status-value">-</div>
+        </div>
+        <div class="status-box">
+            <div class="status-label">NEXT</div>
+            <div class="next-container">
+                <div id="next2" class="next-dot"></div>
+                <div id="next1" class="next-dot"></div>
+            </div>
+        </div>
     </div>
+
+    <div id="canvas-container">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <div class="controls">
+        <div class="control-row">
+            <button id="btn-rot-l" class="btn btn-large">↺ 左回転</button>
+            <button id="btn-rot-r" class="btn btn-large">↻ 右回転</button>
+        </div>
+        <div class="control-row">
+            <button id="btn-left" class="btn">◀ 左</button>
+            <button id="btn-down" class="btn">▼ 下</button>
+            <button id="btn-right" class="btn">▶ 右</button>
+        </div>
+    </div>
+
+    <div id="overlay">
+        <h1 id="overlay-title">ぷよ風パズル</h1>
+        <button id="start-btn">START</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // ゲーム盤面設定 (6列 × 12行)
+        const COLS = 6;
+        const ROWS = 12;
+        let tileSize = 0;
+        let board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+
+        // 色定義
+        const COLORS = {
+            0: 'transparent',
+            1: '#ff4d4d', // 赤
+            2: '#4d79ff', // 青
+            3: '#4dff4d', // 緑
+            4: '#ffff4d'  // 黄
+        };
+
+        // ゲーム状態
+        let gameState = 'START'; // START, PLAYING, CHAINING, GAMEOVER
+        let score = 0;
+        let currentChain = 0;
+        let dropTimer = null;
+        let dropInterval = 800; // 通常落下速度(ms)
+
+        // 操作オブジェクト
+        let currentPuyo = { x: 2, y: 1, rot: 0, c1: 1, c2: 2 };
+        let nextPuyo = { c1: 1, c2: 2 };
+
+        // サウンド用（Web Audio API）
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type, chainCount = 1) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'move') {
+                osc.frequency.setValueAtTime(260, now);
+                osc.frequency.exponentialRampToValueAtTime(130, now + 0.05);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now); osc.stop(now + 0.05);
+            } else if (type === 'rotate') {
+                osc.frequency.setValueAtTime(350, now);
+                osc.frequency.exponentialRampToValueAtTime(450, now + 0.06);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
+                osc.start(now); osc.stop(now + 0.06);
+            } else if (type === 'land') {
+                osc.frequency.setValueAtTime(120, now);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                osc.start(now); osc.stop(now + 0.08);
+            } else if (type === 'clear') {
+                // 連鎖ごとに音が高くなる
+                const baseFreq = 440;
+                const freq = baseFreq * Math.pow(1.122, chainCount);
+                osc.frequency.setValueAtTime(freq, now);
+                osc.frequency.exponentialRampToValueAtTime(freq * 1.3, now + 0.25);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                osc.start(now); osc.stop(now + 0.25);
+            } else if (type === 'gameover') {
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.linearRampToValueAtTime(60, now + 0.6);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.6);
+                osc.start(now); osc.stop(now + 0.6);
+            }
+        }
+
+        // バイブレーション機能
+        function triggerVibration(chainCount) {
+            if (navigator.vibrate) {
+                // 連鎖が大きくなるほど強く、長く震える
+                navigator.vibrate(40 + (chainCount * 25));
+            }
+        }
+
+        // 画面リサイズ
+        function resizeCanvas() {
+            const container = document.getElementById('canvas-container');
+            const size = Math.min(container.clientWidth, (container.clientHeight / 2)) - 20;
+            canvas.width = size;
+            canvas.height = size * 2;
+            tileSize = size / COLS;
+            draw();
+        }
+
+        // 子ぷよの相対位置
+        function getChildOffset(rot) {
+            if (rot === 0) return { dx: 0, dy: -1 }; // 上
+            if (rot === 1) return { dx: 1, dy: 0 };  // 右
+            if (rot === 2) return { dx: 0, dy: 1 };  // 下
+            if (rot === 3) return { dx: -1, dy: 0 }; // 左
+        }
+
+        // 移動・回転判定
+        function isValid(x, y, rot) {
+            if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return false;
+            if (board[y][x] !== 0) return false;
+
+            const offset = getChildOffset(rot);
+            const cx = x + offset.dx;
+            const cy = y + offset.dy;
+
+            if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS) return false;
+            if (board[cy][cx] !== 0) return false;
+
+            return true;
+        }
+
+        // ランダムな色生成
+        function randomColor() {
+            return Math.floor(Math.random() * 4) + 1;
+        }
+
+        // ぷよの生成
+        function spawnPuyo() {
+            currentPuyo = {
+                x: 2, y: 1, rot: 0,
+                c1: nextPuyo.c1, c2: nextPuyo.c2
+            };
+            nextPuyo = { c1: randomColor(), c2: randomColor() };
+            updateNextDisplay();
+
+            if (!isValid(currentPuyo.x, currentPuyo.y, currentPuyo.rot)) {
+                endGame();
+            } else {
+                gameState = 'PLAYING';
+                startDropTimer();
+            }
+        }
+
+        function updateNextDisplay() {
+            document.getElementById('next1').style.backgroundColor = COLORS[nextPuyo.c1];
+            document.getElementById('next2').style.backgroundColor = COLORS[nextPuyo.c2];
+        }
+
+        // ゲームスタート
+        function startGame() {
+            initAudio();
+            board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+            score = 0;
+            currentChain = 0;
+            document.getElementById('score-display').innerText = score;
+            document.getElementById('chain-display').innerText = "-";
+            document.getElementById('overlay').style.display = 'none';
+
+            nextPuyo = { c1: randomColor(), c2: randomColor() };
+            spawnPuyo();
+        }
+
+        function endGame() {
+            gameState = 'GAMEOVER';
+            clearInterval(dropTimer);
+            playSound('gameover');
+            document.getElementById('overlay-title').innerText = "GAME OVER";
+            document.getElementById('start-btn').innerText = "RETRY";
+            document.getElementById('overlay').style.display = 'flex';
+        }
+
+        // 自動落下タイマー
+        function startDropTimer() {
+            clearInterval(dropTimer);
+            dropTimer = setInterval(() => {
+                if (gameState !== 'PLAYING') return;
+                if (isValid(currentPuyo.x, currentPuyo.y + 1, currentPuyo.rot)) {
+                    currentPuyo.y++;
+                    draw();
+                } else {
+                    lockPuyo();
+                }
+            }, dropInterval);
+        }
+
+        // 設置処理
+        function lockPuyo() {
+            clearInterval(dropTimer);
+            gameState = 'CHAINING';
+
+            board[currentPuyo.y][currentPuyo.x] = currentPuyo.c1;
+            const offset = getChildOffset(currentPuyo.rot);
+            board[currentPuyo.y + offset.dy][currentPuyo.x + offset.dx] = currentPuyo.c2;
+
+            playSound('land');
+            draw();
+            setTimeout(processChain, 200);
+        }
+
+        // ちぎれ自由落下処理
+        function applyGravity() {
+            let moved = false;
+            for (let c = 0; c < COLS; c++) {
+                for (let r = ROWS - 2; r >= 0; r--) {
+                    if (board[r][c] !== 0 && board[r + 1][c] === 0) {
+                        let currR = r;
+                        while (currR < ROWS - 1 && board[currR + 1][c] === 0) {
+                            board[currR + 1][c] = board[currR][c];
+                            board[currR][c] = 0;
+                            currR++;
+                            moved = true;
+                        }
+                    }
+                }
+            }
+            return moved;
+        }
+
+        // 4連結消去判定
+        function checkMatches() {
+            let visited = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+            let matchedPositions = [];
+
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (board[r][c] !== 0 && !visited[r][c]) {
+                        let color = board[r][c];
+                        let connected = [];
+                        let queue = [[r, c]];
+                        visited[r][c] = true;
+
+                        while (queue.length > 0) {
+                            let [currR, currC] = queue.shift();
+                            connected.push([currR, currC]);
+
+                            let dirs = [[-1,0], [1,0], [0,-1], [0,1]];
+                            for (let [dr, dc] of dirs) {
+                                let nr = currR + dr;
+                                let nc = currC + dc;
+                                if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+                                    if (!visited[nr][nc] && board[nr][nc] === color) {
+                                        visited[nr][nc] = true;
+                                        queue.push([nr, nc]);
+                                    }
+                                }
+                            }
+                        }
+
+                        if (connected.length >= 4) {
+                            matchedPositions = matchedPositions.concat(connected);
+                        }
+                    }
+                }
+            }
+            return matchedPositions;
+        }
+
+        // 連鎖アニメーションループ
+        function processChain() {
+            const hasDropped = applyGravity();
+            if (hasDropped) {
+                draw();
+                setTimeout(processChain, 150);
+                return;
+            }
+
+            const matches = checkMatches();
+            if (matches.length > 0) {
+                currentChain++;
+                score += matches.length * 10 * currentChain;
+                document.getElementById('score-display').innerText = score;
+                document.getElementById('chain-display').innerText = currentChain + " 連鎖!";
+
+                playSound('clear', currentChain);
+                triggerVibration(currentChain);
+
+                // 消去フラッシュ演出（簡易）
+                for (let [r, c] of matches) {
+                    board[r][c] = 0;
+                }
+                draw();
+                setTimeout(processChain, 400);
+            } else {
+                currentChain = 0;
+                document.getElementById('chain-display').innerText = "-";
+                spawnPuyo();
+            }
+        }
+
+        // 描画メイン
+        function drawPuyoCircle(ctx, x, y, size, colorId) {
+            if (colorId === 0) return;
+            
+            ctx.fillStyle = COLORS[colorId];
+            ctx.beginPath();
+            ctx.arc(x + size / 2, y + size / 2, size / 2 - 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // かわいい目を描画
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(x + size / 3, y + size / 2 - 2, size / 6, 0, Math.PI * 2);
+            ctx.arc(x + size * 2 / 3, y + size / 2 - 2, size / 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.arc(x + size / 3, y + size / 2 - 2, size / 12, 0, Math.PI * 2);
+            ctx.arc(x + size * 2 / 3, y + size / 2 - 2, size / 12, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // グリッド線の描画
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= COLS; i++) {
+                ctx.beginPath(); ctx.moveTo(i * tileSize, 0); ctx.lineTo(i * tileSize, canvas.height); ctx.stroke();
+            }
+            for (let j = 0; j <= ROWS; j++) {
+                ctx.beginPath(); ctx.moveTo(0, j * tileSize); ctx.lineTo(canvas.width, j * tileSize); ctx.stroke();
+            }
+
+            // 固定された盤面のぷよ描画
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (board[r][c] !== 0) {
+                        drawPuyoCircle(ctx, c * tileSize, r * tileSize, tileSize, board[r][c]);
+                    }
+                }
+            }
+
+            // 操作中のぷよ描画
+            if (gameState === 'PLAYING') {
+                drawPuyoCircle(ctx, currentPuyo.x * tileSize, currentPuyo.y * tileSize, tileSize, currentPuyo.c1);
+                const offset = getChildOffset(currentPuyo.rot);
+                drawPuyoCircle(ctx, (currentPuyo.x + offset.dx) * tileSize, (currentPuyo.y + offset.dy) * tileSize, tileSize, currentPuyo.c2);
+            }
+        }
+
+        // 操作コマンド群
+        function moveLeft() {
+            if (gameState !== 'PLAYING') return;
+            if (isValid(currentPuyo.x - 1, currentPuyo.y, currentPuyo.rot)) {
+                currentPuyo.x--; playSound('move'); draw();
+            }
+        }
+
+        function moveRight() {
+            if (gameState !== 'PLAYING') return;
+            if (isValid(currentPuyo.x + 1, currentPuyo.y, currentPuyo.rot)) {
+                currentPuyo.x++; playSound('move'); draw();
+            }
+        }
+
+        function rotate(dir) {
+            if (gameState !== 'PLAYING') return;
+            const nextRot = (currentPuyo.rot + dir + 4) % 4;
+            
+            // 通常の回転判定
+            if (isValid(currentPuyo.x, currentPuyo.y, nextRot)) {
+                currentPuyo.rot = nextRot; playSound('rotate'); draw();
+                return;
+            }
+            // 壁蹴り（左右に1マス逃げて回れるか試す）
+            if (isValid(currentPuyo.x - 1, currentPuyo.y, nextRot)) {
+                currentPuyo.x--; currentPuyo.rot = nextRot; playSound('rotate'); draw();
+                return;
+            }
+            if (isValid(currentPuyo.x + 1, currentPuyo.y, nextRot)) {
+                currentPuyo.x++; currentPuyo.rot = nextRot; playSound('rotate'); draw();
+            }
+        }
+
+        function softDrop() {
+            if (gameState !== 'PLAYING') return;
+            if (isValid(currentPuyo.x, currentPuyo.y + 1, currentPuyo.rot)) {
+                currentPuyo.y++;
+                score += 1; // 下押しスコア微増
+                document.getElementById('score-display').innerText = score;
+                draw();
+            } else {
+                lockPuyo();
+            }
+        }
+
+        // イベントバインド（スマホ用高速イベントとPCキーボード両対応）
+        function bindControl(elementId, action) {
+            const btn = document.getElementById(elementId);
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                action();
+            }, { passive: false });
+        }
+
+        bindControl('btn-left', moveLeft);
+        bindControl('btn-right', moveRight);
+        bindControl('btn-down', softDrop);
+        bindControl('btn-rot-l', () => rotate(-1));
+        bindControl('btn-rot-r', () => rotate(1));
+
+        // キーボード対応（PCブラウザチェック用）
+        window.addEventListener('keydown', (e) => {
+            if (gameState !== 'PLAYING') return;
+            if (e.key === 'ArrowLeft' || e.key === 'a') moveLeft();
+            if (e.key === 'ArrowRight' || e.key === 'd') moveRight();
+            if (e.key === 'ArrowDown' || e.key === 's') softDrop();
+            if (e.key === 'z' || e.key === 'j') rotate(-1);
+            if (e.key === 'x' || e.key === 'k') rotate(1);
+        });
+
+        document.getElementById('start-btn').addEventListener('click', startGame);
+
+        // 初期ロード
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('DOMContentLoaded', () => {
+            resizeCanvas();
+            updateNextDisplay();
+        });
+    </script>
 </body>
 </html>
